@@ -1,0 +1,6 @@
+{
+  "name": "WMS Almoxarifado Pro - Gestão e Controle de Estoque",
+  "description": "Sistema executivo e operacional completo para gestão de estoque, almoxarifado, movimentações e solicitantes com controle RBAC.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
