@@ -72,7 +72,7 @@ export const NovaMovimentacaoModal: React.FC<NovaMovimentacaoModalProps> = ({
 
   const qtdNum = parseFloat(quantidade) || 0;
   const saldoAtual = produtoSelecionado?.estoque_atual ?? 0;
-  const saldoInsuficiente = tipo === 'SAIDA' && qtdNum > saldoAtual;
+  const saldoInsuficiente = Boolean(produtoSelecionado && tipo === 'SAIDA' && qtdNum > saldoAtual);
 
   const valorTotalMov = produtoSelecionado
     ? Number((qtdNum * produtoSelecionado.valor_unitario).toFixed(2))
@@ -83,22 +83,22 @@ export const NovaMovimentacaoModal: React.FC<NovaMovimentacaoModalProps> = ({
     setErrorMessage(null);
 
     if (!selectedProdutoId) {
-      setErrorMessage('Por favor, selecione um produto.');
+      setErrorMessage('Por favor, selecione um produto no catálogo.');
       return;
     }
 
-    if (qtdNum <= 0) {
+    if (qtdNum <= 0 || isNaN(qtdNum)) {
       setErrorMessage('A quantidade deve ser maior que zero.');
       return;
     }
 
     if (tipo === 'SAIDA') {
       if (saldoInsuficiente) {
-        setErrorMessage(`Saldo insuficiente! Estoque disponível: ${saldoAtual}`);
+        setErrorMessage(`Saldo insuficiente! Estoque disponível deste item: ${saldoAtual} ${produtoSelecionado?.unidade_medida}`);
         return;
       }
       if (!matricula.trim()) {
-        setErrorMessage('Para saídas, a matrícula do solicitante é obrigatória.');
+        setErrorMessage('Para saídas, selecione ou digite a matrícula do solicitante.');
         return;
       }
     }
@@ -356,31 +356,47 @@ export const NovaMovimentacaoModal: React.FC<NovaMovimentacaoModalProps> = ({
                   Identificação do Solicitante / Receptor *
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  Preenche nome e área automaticamente
+                  Quem está retirando o material
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              {/* Quick Select Buttons */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] text-slate-400">Atalhos:</span>
+                {solicitantes.filter((s) => s.ativo).slice(0, 4).map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => handleMatriculaChange(s.matricula)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                      matricula === s.matricula
+                        ? 'bg-rose-600 text-white font-bold'
+                        : 'bg-[#1e2133] hover:bg-[#282d44] text-slate-300 border border-[#2e334a]'
+                    }`}
+                  >
+                    {s.nome} ({s.matricula})
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                    Matrícula *
+                    Selecionar Solicitante *
                   </label>
-                  <input
-                    type="text"
-                    list="solicitantes-list"
-                    placeholder="Ex: YSP115"
+                  <select
                     value={matricula}
                     onChange={(e) => handleMatriculaChange(e.target.value)}
                     required
-                    className="w-full bg-[#1b1e2e] border border-[#2d3249] rounded-xl px-3 py-2 text-xs text-white font-mono uppercase focus:outline-none focus:border-rose-500"
-                  />
-                  <datalist id="solicitantes-list">
-                    {solicitantes.map((s) => (
+                    className="w-full bg-[#1b1e2e] border border-[#2d3249] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500"
+                  >
+                    <option value="">Selecione o solicitante...</option>
+                    {solicitantes.filter((s) => s.ativo).map((s) => (
                       <option key={s.id} value={s.matricula}>
-                        {s.nome} - {s.area_departamento}
+                        {s.matricula} — {s.nome} ({s.area_departamento})
                       </option>
                     ))}
-                  </datalist>
+                  </select>
                 </div>
 
                 <div>
@@ -408,6 +424,17 @@ export const NovaMovimentacaoModal: React.FC<NovaMovimentacaoModalProps> = ({
                     className="w-full bg-[#171926] border border-[#282d40] rounded-xl px-3 py-2 text-xs text-slate-300 font-mono"
                   />
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Zero Stock Warning */}
+          {tipo === 'SAIDA' && produtoSelecionado && produtoSelecionado.estoque_atual <= 0 && (
+            <div className="bg-amber-950/60 border border-amber-800/80 rounded-xl p-3 flex items-start gap-2.5 text-xs text-amber-200">
+              <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <strong className="block font-bold text-amber-300">Este item está com saldo zerado (0).</strong>
+                Para alimentar o estoque deste material, clique no botão <strong>"ENTRADA (Receb.)"</strong> acima para registrar a chegada com Nota Fiscal.
               </div>
             </div>
           )}
@@ -444,30 +471,57 @@ export const NovaMovimentacaoModal: React.FC<NovaMovimentacaoModalProps> = ({
           </div>
 
           {/* Submit and Cancel Buttons */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#25293d]">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-[#1f2233] hover:bg-[#282c42] text-slate-300 rounded-xl text-xs font-semibold transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saldoInsuficiente}
-              className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg ${
-                saldoInsuficiente
-                  ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
-                  : tipo === 'SAIDA'
-                  ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/60'
-                  : tipo === 'ENTRADA'
-                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/60'
-                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-950/60'
-              }`}
-            >
-              <CheckCircle className="w-4 h-4" />
-              <span>Confirmar Lançamento</span>
-            </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-[#25293d]">
+            <div className="text-xs text-slate-400">
+              {!selectedProdutoId ? (
+                <span className="text-amber-400">👆 Escolha um material acima</span>
+              ) : saldoInsuficiente ? (
+                <span className="text-rose-400">⚠️ Saldo indisponível (Máx: {saldoAtual})</span>
+              ) : tipo === 'SAIDA' && !matricula.trim() ? (
+                <span className="text-amber-400">👤 Selecione quem está retirando</span>
+              ) : (
+                <span className="text-emerald-400">✓ Dados prontos para gravar</span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 bg-[#1f2233] hover:bg-[#282c42] text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={Boolean(
+                  !selectedProdutoId ||
+                  qtdNum <= 0 ||
+                  saldoInsuficiente ||
+                  (tipo === 'SAIDA' && !matricula.trim())
+                )}
+                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-lg ${
+                  !selectedProdutoId || qtdNum <= 0 || saldoInsuficiente || (tipo === 'SAIDA' && !matricula.trim())
+                    ? 'bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-700/60'
+                    : tipo === 'SAIDA'
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/60 cursor-pointer'
+                    : tipo === 'ENTRADA'
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-950/60 cursor-pointer'
+                    : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-950/60 cursor-pointer'
+                }`}
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>
+                  {!selectedProdutoId
+                    ? 'Selecione o Produto'
+                    : saldoInsuficiente
+                    ? `Saldo Insuficiente (${saldoAtual})`
+                    : tipo === 'SAIDA' && !matricula.trim()
+                    ? 'Informe o Solicitante'
+                    : 'Confirmar Lançamento'}
+                </span>
+              </button>
+            </div>
           </div>
         </form>
       </div>
